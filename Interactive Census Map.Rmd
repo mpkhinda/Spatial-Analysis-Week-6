@@ -1,7 +1,7 @@
 ---
 title: "Interactive Census Map"
 author: "Matt Khinda"
-date: "10/12/2021"
+date: "10/14/2021"
 output: html_document
 ---
 
@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r setup, include = FALSE}
+```{r load libraries, include = FALSE}
 library(tidycensus)
 library(leaflet)
 library(sf)
@@ -27,13 +27,19 @@ View(v19)
 
 ```
 
-```{r interactive map, echo=FALSE}
+**Comapring Median Ownership and Rentership Housing Costs in New York City**  
+The rising costs of housing in NYC are an ever-talked-about urban planning issue, with much of that conversation focusing on rent and renters. While this is understandable given that about 68% of households are renter-occupied, it prompted me to wonder how the monthly costs of rent compare to the monthly cost of ownership (not including initial cost of purchase). This interactive map explores that comparison by indicating whether costs of owning or renting are greater in different census tracts of New York City. The data displayed comes from the 2019 American Community Survey (ACS), specifically Median Gross Rent (B25064_001) and Selected Monthly Owner Costs (B25094_001). 
+
+```{r get data, include = FALSE, results = 'hide'}
 NYC_housingcost <- get_acs(geography = "tract",  state = "NY",
                            year = 2019, survey = "acs5",
                            variables = c(med_gross_rent = "B25063_001", med_owner_cost = "B25088_001",tot_units = "B25003_001", tot_owner = "B25003_002", tot_renter = "B25003_003"),
-                           output = "wide", geometry = TRUE) 
+                           output = "wide", geometry = TRUE)
+```
 
-NYC_housingcost <- NYC_housingcost %>%
+
+```{r interactive map, echo=FALSE}
+ NYC_housingcost <- NYC_housingcost %>%
   select(-med_gross_rentM, -med_owner_costM, -tot_ownerM, -tot_renterM, - tot_unitsM) %>%
   mutate(pct_renter = round((tot_renterE/tot_unitsE)*100, 1)) %>%
   mutate(pct_owner = round((tot_ownerE/tot_unitsE)*100, 1)) %>%
