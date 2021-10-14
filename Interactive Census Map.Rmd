@@ -18,6 +18,7 @@ library(ggthemes)
 library(ggspatial)
 library(htmlwidgets)
 library(tidytransit)
+library(here)
 ```
 
 ```{r exploring variables, include = FALSE}
@@ -27,45 +28,44 @@ View(v19)
 ```
 
 ```{r interactive map, echo=FALSE}
-USA_tenure <- get_acs(geography = "county", 
+NYC_housingcost <- get_acs(geography = "tract",  state = "NY",
                            year = 2019, survey = "acs5",
-                           variables = c(tot_units = "B25003_001", tot_owner = "B25003_002", tot_renter = "B25003_003"),
+                           variables = c(med_gross_rent = "B25063_001", med_owner_cost = "B25088_001",tot_units = "B25003_001", tot_owner = "B25003_002", tot_renter = "B25003_003"),
                            output = "wide", geometry = TRUE) 
 
-USA_tenure <- USA_tenure %>%
-  select(-tot_ownerM, -tot_renterM, - tot_unitsM) %>%
-  mutate(pct_tenurediff = round((tot_ownerE - tot_renterE)/(tot_ownerE + tot_renterE)*100, 1))
+NYC_housingcost <- NYC_housingcost %>%
+  select(-med_gross_rentM, -med_owner_costM, -tot_ownerM, -tot_renterM, - tot_unitsM) %>%
+  mutate(pct_renter = round((tot_renterE/tot_unitsE)*100, 1)) %>%
+  mutate(pct_owner = round((tot_ownerE/tot_unitsE)*100, 1)) %>%
+  mutate(pays_more = ifelse(med_owner_costE > med_gross_rentE, "Owners pay more", "Renters pay more")
+           ) %>%
+  mutate(med_owner_costE =  replace_na(med_owner_costE, "Unknown")) %>%
+  mutate(pays_more =  replace_na(pays_more, "Unknown")) %>%
+  st_transform("WGS84")
+  
+NYC_boundaries <- read_sf(here("Data", "NYCBoundaries.geojson")) %>%
+  st_transform("WGS84")
 
-USA_tenure_palette <- colorNumeric(c("pink", "lightblue"),USA_tenure$pct_tenurediff)
+NYC_housingcost_clipped <- NYC_housingcost[NYC_boundaries,]
 
-USA_tenure_map <- leaflet(USA_tenure) %>%
-  addProviderTiles("Stamen.TonerLite") %>%
-  addPolygons(stroke = FALSE, fillOpacity = 0.7,
-    color = ~USA_tenure_palette(pct_tenurediff))
 
-USA_tenure_map
+NYC_hc_palette <- colorFactor(palette = c('#FF7F58', '#611831', 'white'),
+  domain = NYC_housingcost_clipped$pays_more
+)
+
+NYC_hc_map <- leaflet(NYC_housingcost_clipped) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(fillColor = ~NYC_hc_palette(pays_more), weight = 0.45, color = "white", fillOpacity = 0.8,
+              highlightOptions = highlightOptions(fillColor = "#FDFF64", fillOpacity = 0.8),
+              label = NYC_housingcost_clipped$NAME,
+              popup = paste("Median Monthly Owner Costs: ", " $",NYC_housingcost_clipped$med_owner_costE, "<br/>",
+                            "Median Monthly Gross Rent: ", " $",NYC_housingcost_clipped$med_gross_rentE, "<br/>",
+                            "Total Owners: ", NYC_housingcost_clipped$tot_ownerE, " (", NYC_housingcost_clipped$pct_owner,"%)", "<br/>",
+                            "Total Renters: ", NYC_housingcost_clipped$tot_renterE," (", NYC_housingcost_clipped$pct_renter,"%)", sep = "")) %>%
+  addLegend("bottomright", pal = NYC_hc_palette, values = ~pays_more,
+    title = "Who Pays More in Monthly Housing Costs?",
+    opacity = 1)
+
+NYC_hc_map
 
 ```
-
-```{r interactive map, echo=FALSE}
-LA_tenure <- get_acs(geography = "tract", county = c("Los Angeles", "Ventura", "Orange"), state = "CA", 
-                           year = 2019, survey = "acs5",
-                           variables = c(tot_units = "B25003_001", tot_owner = "B25003_002", tot_renter = "B25003_003"),
-                           output = "wide", geometry = TRUE) 
-
-LA_tenure <- LA_tenure %>%
-  select(-tot_ownerM, -tot_renterM, - tot_unitsM) %>%
-  mutate(pct_tenurediff = round((tot_ownerE - tot_renterE)/(tot_ownerE + tot_renterE)*100, 1))
-
-LA_tenure_palette <- colorNumeric(c("pink", "lightblue"),LA_tenure$pct_tenurediff)
-
-LA_tenure_map <- leaflet(LA_tenure) %>%
-  addProviderTiles("Stamen.TonerLite") %>%
-  addPolygons(stroke = FALSE, fillOpacity = 0.7,
-    color = ~LA_tenure_palette(pct_tenurediff))
-
-LA_tenure_map
-
-```
-
-
